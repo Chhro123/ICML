@@ -47,13 +47,6 @@ If you find this work useful, please cite:
 
 ---
 
-### 3️⃣ Setup Datasets
-Download and preprocess the datasets (MVTec-AD, BTAD):
-
-```bash
-bash scripts/download_datasets.sh
-```
-
 ## 🚀 Training PANDA
 To train PANDA on MVTec-AD:
 
