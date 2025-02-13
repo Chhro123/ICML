@@ -17,7 +17,7 @@ PANDA achieves **state-of-the-art** (SOTA) performance on **MVTec-AD** and **BTA
 
 ---
 
-## 📄 Paper
+<!-- ## 📄 Paper
 If you find this work useful, please cite:
 
 ```bibtex
@@ -27,17 +27,18 @@ If you find this work useful, please cite:
   booktitle = {International Conference on Machine Learning (ICML)},
   year = {2025}
 }
-```
+``` -->
 
 ---
 
 ## 🏗️ Repository Structure
 ```
-├── assets/                 # Figures and visualizations
+├── Seg_log/                 # Logs of downstream segmentation models
 ├── configs/                # Model configuration files
 ├── datasets/               # Data preprocessing scripts
-├── models/                 # PANDA model implementation
-├── scripts/                # Training and inference scripts
+├── ldm/                    # PANDA model implementation
+├── taming/                    # Basic functions
+├── scripts/                
 ├── utils/                  # Utility functions
 ├── main.py                 # Entry point for training and testing
 ├── requirements.txt        # Required Python packages
@@ -46,26 +47,6 @@ If you find this work useful, please cite:
 
 ---
 
-## 📦 Installation
-### 1️⃣ Clone the Repository
-```bash
-git clone https://github.com/your-repo/PANDA.git
-cd PANDA
-```
-
-### 2️⃣ Install Dependencies
-It is recommended to use a **virtual environment** (e.g., `venv` or `conda`).
-
-```bash
-pip install -r requirements.txt
-```
-OR (for Conda users)
-```bash
-conda create --name panda_env python=3.9
-conda activate panda_env
-pip install -r requirements.txt
-```
-
 ### 3️⃣ Setup Datasets
 Download and preprocess the datasets (MVTec-AD, BTAD):
 
@@ -73,50 +54,26 @@ Download and preprocess the datasets (MVTec-AD, BTAD):
 bash scripts/download_datasets.sh
 ```
 
-If you want to use your own dataset, place images in:
-```
-datasets/
-├── my_dataset/
-│   ├── train/  # Normal images
-│   ├── test/   # Normal + Anomaly images
-│   ├── masks/  # Ground truth anomaly masks
-```
-
----
-
 ## 🚀 Training PANDA
 To train PANDA on MVTec-AD:
 
 ```bash
-python main.py --dataset mvtec --epochs 100 --batch_size 16
+python main.py --base config_file -t --actual_resume models/ldm/text2img-large/model.ckpt -n test --gpus 0, --init_word "word"  --mvtec_path='mvtec_data_path/'  --log_folder "save_log_path" 
 ```
 For BTAD dataset:
 ```bash
-python main.py --dataset btad --epochs 100 --batch_size 16
+python main.py --base config_file -t --actual_resume models/ldm/text2img-large/model.ckpt -n test --gpus 0, --init_word "word"  --mvtec_path='btad_data_path/'  --log_folder "save_log_path" 
 ```
 
-✅ Training arguments:
-| Argument        | Description                                   | Default |
-|----------------|-----------------------------------------------|---------|
-| `--dataset`    | Dataset name (`mvtec`, `btad`, `custom`)     | `mvtec` |
-| `--epochs`     | Number of training epochs                    | `100`   |
-| `--batch_size` | Batch size                                   | `16`    |
-| `--lr`         | Learning rate                                | `1e-4`  |
-
----
 
 ## 🧐 Evaluation & Inference
 Run inference on test images:
 
 ```bash
-python main.py --mode test --dataset mvtec
-```
-OR for custom images:
-```bash
-python main.py --mode test --dataset custom --input_dir path/to/images
+python generate_with_mask_mvtec.py --data_root='normal_data_path' --weight_idx weight_param --sample_name='save_image_folder' --init_word "word" --anomaly_name='save_image_subfolder' --pt_path='weight_path/' --mask_path='mask_path/'
 ```
 
-Results will be saved in `outputs/` directory.
+Results will be saved in `save_image_folder/` directory.
 
 ---
 
