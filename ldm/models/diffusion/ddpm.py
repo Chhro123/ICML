@@ -1721,7 +1721,7 @@ class Layout2ImgDiffusion(LatentDiffusion):
         logs['bbox_image'] = cond_img
         return logs
 
-class PANDA(DDPM):
+class STAGE(DDPM):
     """main class"""
     def __init__(self,
                  first_stage_config,
@@ -2481,7 +2481,7 @@ class PANDA(DDPM):
 
         # 计算原图的loss
         mask_full = torch.ones_like(mask).to(device=self.device)  # 定义覆盖整个图像的mask 
-        mask = self.PMA(step=t, total_steps=self.num_timesteps, shrink_end=self.num_timesteps-800, mask_full=mask_full, mask_original=mask_ori)
+        mask = self.EMA(step=t, total_steps=self.num_timesteps, shrink_end=self.num_timesteps-800, mask_full=mask_full, mask_original=mask_ori)
 
         # t是一个[b,1]size的值，选第一个
         x_noisy = self.q_sample(x_start=x_start, t=t,noise=noise)
@@ -2599,6 +2599,7 @@ class PANDA(DDPM):
 
             x_recon = model_out
 
+        #AIF SAMPLING
         elif self.parameterization == "texture":
             # x_recon = x_recon = model_out * mask + clean_img * (1 - mask)
             x_start_pred = self.predict_start_from_noise(x, t=t, noise=model_out)
@@ -2737,53 +2738,57 @@ class PANDA(DDPM):
         iterator = tqdm(reversed(range(0, sample_start)), desc='Sampling t', total=timesteps) if verbose else reversed(
             range(0, timesteps))
 
-        from torchvision.utils import save_image
-
         if mask is not None:
             assert x0 is not None
             assert x0.shape[2:3] == mask.shape[2:3]  # spatial size has to match
-
-        output_dir = 'temp_noise2'
-        os.makedirs(output_dir, exist_ok=True)
 
         # 在采样循环中应用新的mask计算和位置引导
         mask_full = torch.ones_like(mask).to(device=device)  # 定义覆盖整个图像的mask 
         current_mask = mask_full
         mask_image = img
         for i in iterator:
-
+            # ts 表示当前扩散步 t
             ts = torch.full((b,), i, device=device, dtype=torch.long)
+            # ts_prev 表示第 t-1 步（前一时刻），下界固定为 0
+            ts_prev = torch.clamp(ts - 1, min=0)
+
             if self.shorten_cond_schedule:
                 assert self.model.conditioning_key != 'hybrid'
                 tc = self.cond_ids[ts].to(cond.device)
                 cond = self.q_sample(x_start=cond, t=tc, noise=torch.randn_like(cond))
 
-            # 第t步的背景
-            # # current_mask
-            img_orig = self.q_sample(clean_img, ts)
-            mask_orig = self.q_sample(mask, ts)
-            # if 800 >= i >= 700 or (400 >= i >= 250):
+            img_orig  = self.q_sample(clean_img, ts_prev)  # 对应 x_{t-1} 的原始背景
+            mask_orig = self.q_sample(mask,      ts_prev)  # 对应 x_{t-1} 的原始掩码
+
             if 800 >= i >= 700 or (400 >= i >= 300):
-          
-                mask_image = self.p_sample(mask_image, cond, ts, mask, clean_img = mask,
-                                    clip_denoised=self.clip_denoised,
-                                    quantize_denoised=quantize_denoised,embedding_position=embedding_position,isMask=True)
-                
-                img = mask * mask_image + img_orig * ( 1 - mask)
-                mask_image = mask * mask_image + mask_orig * ( 1- mask)
-                
+                # 进入 Anomaly-Only 分支，这里 mask_image/p_sample(x_t) 输出的就是 x_{t-1}
+                mask_image = self.p_sample(
+                    mask_image, cond, ts, mask,
+                    clean_img=mask,
+                    clip_denoised=self.clip_denoised,
+                    quantize_denoised=quantize_denoised,
+                    embedding_position=embedding_position,
+                    isMask=True
+                )
+
+                # 此时 mask_image 对应的是 x_{t-1}，而 img_orig/mask_orig 也是 x_{t-1}，可直接拼接
+                img = mask * mask_image + img_orig * (1 - mask)
+                mask_image = mask * mask_image + mask_orig * (1 - mask)
 
             else:
-                # print("original image")
-                img = self.p_sample(img, cond, ts, current_mask, clean_img = clean_img,
-                                    clip_denoised=self.clip_denoised,
-                                    quantize_denoised=quantize_denoised,embedding_position=embedding_position,isMask=False)
-                # if i != 0 :
-                mask_image = mask * img + mask_orig * ( 1- mask)
-                img = current_mask * img + img_orig * ( 1- current_mask)
-                
+                img = self.p_sample(
+                    img, cond, ts, current_mask,
+                    clean_img=clean_img,
+                    clip_denoised=self.clip_denoised,
+                    quantize_denoised=quantize_denoised,
+                    embedding_position=embedding_position,
+                    isMask=False
+                )
 
-            current_mask = self.PMA(step=i, total_steps=sample_start, shrink_end=sample_start-800, mask_full=mask_full, mask_original=mask)
+                mask_image = mask * img + mask_orig * (1 - mask)
+                img        = current_mask * img + img_orig * (1 - current_mask)
+
+            current_mask = self.EMA(step=i, total_steps=sample_start, shrink_end=sample_start-800, mask_full=mask_full, mask_original=mask)
 
             
             # current_mask = mask
@@ -3098,7 +3103,7 @@ class PANDA(DDPM):
             save_image(x_samples,'generated_dataset/tmp/0-%d.jpg'%i,normalize=True)
         exit()
 
-    def PMA(self, step, total_steps=1000, shrink_end=100, mask_full=None, mask_original=None):
+    def EMA(self, step, total_steps=1000, shrink_end=100, mask_full=None, mask_original=None):
         """
         """
         # 计算 alpha，只对 step >= shrink_end 的元素进行计算
@@ -3119,7 +3124,7 @@ class PANDA(DDPM):
         return current_mask
 
 
-    def PMA_cos(self,step, total_steps=1000, shrink_end=100, mask_full=None, mask_original=None):
+    def EMA_cos(self,step, total_steps=1000, shrink_end=100, mask_full=None, mask_original=None):
         """
         计算当前步数的二值化mask。
         
