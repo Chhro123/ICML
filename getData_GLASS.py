@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 # 假设 perlin_mask 函数已经定义并导入
 from perlin import perlin_mask
 
-# 定义类别名称及相关常量
+# 定义类别名称及相关常量，MVTEC-AD
 _CLASSNAMES = [
     "carpet",
     "grid",
