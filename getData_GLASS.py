@@ -323,7 +323,7 @@ def initialize_and_save_images(mvtec_root, anomaly_texture_root, classnames=_CLA
 
 if __name__ == "__main__":
     # 根据实际情况设置 MVTec 数据集路径及其它参数
-    mvtec_root = "../MVTEC_AD"  # 修改为你的数据集路径
+    mvtec_root = "../MVTEC_AD"  # 修改数据集路径
     anomaly_texture_root = "/Data/xxc/GLASS/dtd/images"  # 修改为异常纹理数据路径
 
     # 调用初始化函数进行异常图像和掩码保存
